@@ -4,7 +4,6 @@ import numpy as np
 import plotly.express as px
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
-from sklearn.decomposition import PCA
 from sklearn.preprocessing import LabelEncoder, StandardScaler
 from sklearn.impute import SimpleImputer
 from sklearn.ensemble import (
@@ -450,22 +449,7 @@ if active == 1:
             st.rerun()
     
     with col2:
-        if len(features) >= 2:
-            with st.spinner("🔄 Computing PCA projection..."):
-                temp_df = df[features].dropna().select_dtypes(include=[np.number])
-                if temp_df.shape[1] >= 2 and temp_df.shape[0] > 5:
-                    pca = PCA(n_components=2)
-                    comps = pca.fit_transform(StandardScaler().fit_transform(temp_df))
-                    color_series = df.loc[temp_df.index, target_col].astype(str)
-                    fig = px.scatter(
-                        x=comps[:, 0], y=comps[:, 1], color=color_series,
-                        labels={'x': f'PC1 ({pca.explained_variance_ratio_[0]:.1%})',
-                                'y': f'PC2 ({pca.explained_variance_ratio_[1]:.1%})'},
-                        title="2D PCA Projection",
-                        color_discrete_sequence=["#f97316","#a78bfa","#10b981","#facc15","#ef4444"]
-                    )
-                    fig.update_traces(marker=dict(size=6, opacity=0.8))
-                    st.plotly_chart(styled_fig(fig), use_container_width=True)
+        st.info("📊 Visualization space reserved for additional analysis.")
 
 # ─────────────────────────────────────────────
 #  STAGE 2 — EDA
@@ -897,7 +881,19 @@ elif active == 5:
     
     if problem_type == "Classification":
         le = LabelEncoder()
-        y = le.fit_transform(y_raw.astype(str))
+        y_str = y_raw.astype(str)
+        
+        # ✅ FIX: Encode minority class as 1 for fraud detection
+        # Count classes and put minority (assumed fraud) as positive class
+        val_counts = y_str.value_counts()
+        minority_class = val_counts.idxmin()  # Smallest class = fraud
+        majority_class = val_counts.idxmax()  # Largest class = legitimate
+        
+        # Force encoding with minority as 1, majority as 0
+        y = le.fit_transform(y_str)
+        # Swap if needed so minority class (fraud) = 1
+        if le.transform([minority_class])[0] == 0:
+            y = 1 - y  # Flip: 0→1, 1→0
         class_names = le.classes_
     else:
         y = pd.to_numeric(y_raw, errors='coerce').fillna(0).values
